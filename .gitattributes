@@ -1,3 +1,33 @@
 #Project Servo Skull
 # Auto detect text files and perform LF normalization
-* text=auto
+#include <SoftwareSerial.h>
+# More or less test code and a basic outline
+SoftwareSerial mp3(10, 11); // RX, TX
+
+void sendCommand(byte command, byte data1, byte data2) {
+  byte packet[8] = {0x7E, 0xFF, 0x06, command, 0x00, data1, data2, 0xEF};
+  for (int i = 0; i < 8; i++) {
+    mp3.write(packet[i]);
+  }
+}
+
+void playTrack(int track) {
+  sendCommand(0x03, 0x00, track); // Play track number
+}
+
+void setVolume(int volume) {
+  sendCommand(0x06, 0x00, volume); // Volume 0–30
+}
+
+void setup() {
+  mp3.begin(9600);
+  delay(1000);
+
+  setVolume(20);    // Set volume (0–30)
+  delay(500);
+
+  playTrack(1);     // Play 0001.mp3
+}
+
+void loop() {
+}
