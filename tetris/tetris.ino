@@ -3,23 +3,21 @@ Dev: Liam Treat, Brennen Koernke
 Resources: Chat Gpt
 */
 
-//tetris
-
-#include <LedControl.h>
-
-#define DIN 11
-#define CLK 13
-#define CS 10
-
-LedControl lc = LedControl(DIN, CLK, CS, 1);
-
-// Joystick pins
-#define JOY_X A0
-#define JOY_Y A1
-#define JOY_SW A2   // Button now on analog pin A2
+// Multiplexed 12x8 LED Matrix Tetris
 
 #define WIDTH 8
-#define HEIGHT 8
+#define HEIGHT 12
+
+// Columns D2-D9
+const byte colPins[WIDTH] = {2,3,4,5,6,7,8,9};
+
+// Rows D10-D13 + A3-A5 (total 12 rows)
+const byte rowPins[HEIGHT] = {10,11,12,13,A3,A4,A5, -1, -1, -1, -1, -1}; // unused rows as -1
+
+// Joystick
+#define JOY_X A0
+#define JOY_Y A1
+#define JOY_SW A2
 
 byte board[HEIGHT][WIDTH];
 
@@ -27,9 +25,10 @@ unsigned long lastDrop = 0;
 unsigned long dropInterval = 600;
 
 int pieceX, pieceY;
-int currentPiece;
+byte currentPiece;
 byte rotationState;
 
+// 7 Tetris pieces
 const byte pieces[7][4][4] = {
   {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}}, // I
   {{1,1,0,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}}, // O
@@ -40,6 +39,19 @@ const byte pieces[7][4][4] = {
   {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}}  // Z
 };
 
+// ---------- Setup ----------
+void setup() {
+  for(byte i=0;i<WIDTH;i++) pinMode(colPins[i], OUTPUT);
+  for(byte i=0;i<HEIGHT;i++) if(rowPins[i]!=-1) pinMode(rowPins[i], OUTPUT);
+  
+  pinMode(JOY_SW, INPUT_PULLUP);
+  randomSeed(analogRead(0));
+  
+  clearBoard();
+  spawnPiece();
+}
+
+// ---------- Game Logic ----------
 void clearBoard() {
   for(int y=0;y<HEIGHT;y++)
     for(int x=0;x<WIDTH;x++)
@@ -47,18 +59,22 @@ void clearBoard() {
 }
 
 void spawnPiece() {
-  currentPiece = random(0,7);
-  rotationState = 0;
-  pieceX = 2;
-  pieceY = 0;
+  currentPiece=random(0,7);
+  rotationState=0;
+  pieceX=2;
+  pieceY=0;
 }
 
-bool collision(int newX, int newY) {
+bool collision(int nx,int ny,int rot){
   for(int y=0;y<4;y++){
     for(int x=0;x<4;x++){
-      if(pieces[currentPiece][y][x]){
-        int bx = newX + x;
-        int by = newY + y;
+      int rx=x,ry=y;
+      for(int r=0;r<rot;r++){
+        int tmp=rx; rx=3-ry; ry=tmp;
+      }
+      if(pieces[currentPiece][ry][rx]){
+        int bx=nx+x;
+        int by=ny+y;
         if(bx<0 || bx>=WIDTH || by>=HEIGHT) return true;
         if(by>=0 && board[by][bx]) return true;
       }
@@ -67,17 +83,24 @@ bool collision(int newX, int newY) {
   return false;
 }
 
-void lockPiece() {
+void lockPiece(){
   for(int y=0;y<4;y++){
     for(int x=0;x<4;x++){
-      if(pieces[currentPiece][y][x]){
-        board[pieceY+y][pieceX+x]=1;
+      int rx=x, ry=y;
+      for(int r=0;r<rotationState;r++){
+        int tmp=rx; rx=3-ry; ry=tmp;
+      }
+      if(pieces[currentPiece][ry][rx]){
+        int px=pieceX+x;
+        int py=pieceY+y;
+        if(py>=0 && py<HEIGHT && px>=0 && px<WIDTH)
+          board[py][px]=1;
       }
     }
   }
 }
 
-void clearLines() {
+void clearLines(){
   for(int y=0;y<HEIGHT;y++){
     bool full=true;
     for(int x=0;x<WIDTH;x++)
@@ -92,86 +115,50 @@ void clearLines() {
   }
 }
 
-void draw() {
-  lc.clearDisplay(0);
-
-  for(int y=0;y<HEIGHT;y++)
-    for(int x=0;x<WIDTH;x++)
-      if(board[y][x])
-        lc.setLed(0,y,x,true);
-
-  for(int y=0;y<4;y++)
-    for(int x=0;x<4;x++)
-      if(pieces[currentPiece][y][x])
-        lc.setLed(0,pieceY+y,pieceX+x,true);
+// ---------- Draw Function ----------
+void draw(){
+  // Multiplexing
+  for(byte r=0;r<HEIGHT;r++){
+    if(rowPins[r]==-1) continue;
+    digitalWrite(rowPins[r], LOW); // turn row on (common cathode)
+    for(byte c=0;c<WIDTH;c++){
+      digitalWrite(colPins[c], !board[r][c]); // LOW to turn on LED
+    }
+    delayMicroseconds(1000); // row display time
+    digitalWrite(rowPins[r], HIGH); // turn row off
+  }
 }
 
-void rotatePiece() {
-  byte temp[4][4];
-  for(int y=0;y<4;y++)
-    for(int x=0;x<4;x++)
-      temp[x][3-y]=pieces[currentPiece][y][x];
-
-  byte backup[4][4];
-  memcpy(backup,pieces[currentPiece],16);
-  memcpy((void*)pieces[currentPiece],temp,16);
-
-  if(collision(pieceX,pieceY))
-    memcpy((void*)pieces[currentPiece],backup,16);
-}
-
-void readJoystick() {
-  int xVal = analogRead(JOY_X);
-  int yVal = analogRead(JOY_Y);
-
-  if(xVal < 300 && !collision(pieceX-1,pieceY)){
-    pieceX--;
-    delay(150);
-  }
-  if(xVal > 700 && !collision(pieceX+1,pieceY)){
-    pieceX++;
-    delay(150);
-  }
-  if(yVal > 700 && !collision(pieceX,pieceY+1)){
-    pieceY++;
-    delay(100);
-  }
-
-  if(digitalRead(JOY_SW)==LOW){
-    rotatePiece();
+// ---------- Joystick Input ----------
+void readJoystick(){
+  int xVal=analogRead(JOY_X);
+  int yVal=analogRead(JOY_Y);
+  
+  if(xVal<300 && !collision(pieceX-1,pieceY,rotationState)){ pieceX--; delay(150);}
+  if(xVal>700 && !collision(pieceX+1,pieceY,rotationState)){ pieceX++; delay(150);}
+  if(yVal>700 && !collision(pieceX,pieceY+1,rotationState)){ pieceY++; delay(100);}
+  
+  if(analogRead(JOY_SW)<100){
+    int newRot=(rotationState+1)%4;
+    if(!collision(pieceX,pieceY,newRot)) rotationState=newRot;
     delay(200);
   }
 }
 
-void setup() {
-  lc.shutdown(0,false);
-  lc.setIntensity(0,8);
-  lc.clearDisplay(0);
-
-  pinMode(JOY_SW, INPUT_PULLUP);
-
-  randomSeed(analogRead(0));
-
-  clearBoard();
-  spawnPiece();
-}
-
-void loop() {
+// ---------- Main Loop ----------
+void loop(){
   readJoystick();
-
+  
   if(millis()-lastDrop>dropInterval){
-    if(!collision(pieceX,pieceY+1)){
-      pieceY++;
-    } else {
+    if(!collision(pieceX,pieceY+1,rotationState)) pieceY++;
+    else{
       lockPiece();
       clearLines();
       spawnPiece();
-      if(collision(pieceX,pieceY)){
-        clearBoard();
-      }
+      if(collision(pieceX,pieceY,rotationState)) clearBoard(); // Game Over
     }
     lastDrop=millis();
   }
-
+  
   draw();
 }
