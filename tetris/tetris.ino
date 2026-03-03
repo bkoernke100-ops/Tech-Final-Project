@@ -12,6 +12,7 @@ ArduinoLEDMatrix matrix;
 #define WIDTH 8
 #define HEIGHT 8
 
+// Joystick pins
 #define JOY_X A0
 #define JOY_Y A1
 #define JOY_SW A2
@@ -24,7 +25,7 @@ int currentPiece;
 int rotationState = 0;
 
 unsigned long lastDrop = 0;
-unsigned long dropInterval = 2000; // slower fall
+unsigned long dropInterval = 1200; // slower fall
 
 // 4 pieces: I, Z, T, L
 const uint8_t pieces[4][4][4] = {
@@ -65,8 +66,8 @@ void clearBoard(){
 void spawnPiece(){
   currentPiece = random(0,4);
   pieceX = 2;
-  pieceY = 0;
-  rotationState = 0; // reset rotation
+  pieceY = -2; // spawn partially above board so full piece appears
+  rotationState = 0;
 }
 
 bool collision(int nx,int ny,int rot){
@@ -129,10 +130,11 @@ void updateFrame(){
     for(int x=0;x<WIDTH;x++)
       frame[y][x] = board[y][x];
 
-  // overlay piece with rotation
+  // overlay falling piece with rotation
   for(int y=0;y<4;y++){
     for(int x=0;x<4;x++){
       int rx = x, ry = y;
+      // apply rotation
       for(int r=0;r<rotationState;r++){
         int tmp = rx;
         rx = 3 - ry;
@@ -141,8 +143,9 @@ void updateFrame(){
       if(pieces[currentPiece][ry][rx]){
         int bx = pieceX + x;
         int by = pieceY + y;
-        if(by>=0 && by<HEIGHT && bx>=0 && bx<WIDTH)
-          frame[by][bx] = 1;
+        if(bx >= 0 && bx < WIDTH && by < HEIGHT){
+          if(by >= 0) frame[by][bx] = 1;
+        }
       }
     }
   }
@@ -197,5 +200,5 @@ void loop(){
   }
 
   updateFrame();
-  matrix.renderBitmap(frame, 8, 8);
+  matrix.renderBitmap(frame, 8, 8); // strictly 8x8
 }
