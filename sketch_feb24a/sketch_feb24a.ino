@@ -3,211 +3,92 @@ Dev: Liam Treat, Brennen Koernke
 Resources: Chat Gpt
 */
 
-#include <Arduino_LED_Matrix.h>
+// ===== 3 SPEAKER DR MARIO "FEVER" =====
+// Melody = pin 9
+// Harmony = pin 10
+// Bass = pin 11
 
-ArduinoLEDMatrix matrix;
+#define SPK1 9
+#define SPK2 10
+#define SPK3 11
 
-#define WIDTH 12
-#define HEIGHT 8
+// Note Frequencies
+#define E5 659
+#define D5 587
+#define C5 523
+#define G5 784
+#define B4 494
+#define G4 392
+#define C4 262
 
-#define JOY_X A0
-#define JOY_Y A1
-#define JOY_SW A2
+volatile unsigned long phase1 = 0;
+volatile unsigned long phase2 = 0;
+volatile unsigned long phase3 = 0;
 
-uint8_t board[HEIGHT][WIDTH];
-uint8_t frame[HEIGHT][WIDTH];
+volatile unsigned long freq1 = 0;
+volatile unsigned long freq2 = 0;
+volatile unsigned long freq3 = 0;
 
-int pieceX, pieceY;
-int currentPiece;
-int rotationState = 0;
+void setupTimer() {
+  cli();
+  TCCR1A = 0;
+  TCCR1B = 0;
+  OCR1A = 159;
+  TCCR1B |= (1 << WGM12);
+  TCCR1B |= (1 << CS10);
+  TIMSK1 |= (1 << OCIE1A);
+  sei();
+}
 
-unsigned long lastDrop = 0;
-unsigned long dropInterval = 2000;
-
-// 7 Tetris pieces (4 rotations each)
-const uint8_t pieces[7][4][4][4] = {
-
-  // I
-  {
-    {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}},
-    {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}},
-    {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}}
-  },
-
-  // O
-  {
-    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}}
-  },
-
-  // T
-  {
-    {{0,1,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}},
-    {{0,0,0,0},{1,1,1,0},{0,1,0,0},{0,0,0,0}},
-    {{0,1,0,0},{1,1,0,0},{0,1,0,0},{0,0,0,0}}
-  },
-
-  // L
-  {
-    {{1,0,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,1,0},{0,1,0,0},{0,1,0,0},{0,0,0,0}},
-    {{0,0,0,0},{1,1,1,0},{0,0,1,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,0,0},{1,1,0,0},{0,0,0,0}}
-  },
-
-  // J
-  {
-    {{0,0,1,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,0,0},{0,1,1,0},{0,0,0,0}},
-    {{0,0,0,0},{1,1,1,0},{1,0,0,0},{0,0,0,0}},
-    {{1,1,0,0},{0,1,0,0},{0,1,0,0},{0,0,0,0}}
-  },
-
-  // S
-  {
-    {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,1,0},{0,0,1,0},{0,0,0,0}},
-    {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,1,0},{0,0,1,0},{0,0,0,0}}
-  },
-
-  // Z
-  {
-    {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,0,1,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}},
-    {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,0,1,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}}
+ISR(TIMER1_COMPA_vect) {
+  if (freq1) {
+    phase1 += freq1;
+    digitalWrite(SPK1, (phase1 & 0x8000) ? HIGH : LOW);
   }
-};
-
-void clearBoard() {
-  for(int y=0;y<HEIGHT;y++)
-    for(int x=0;x<WIDTH;x++)
-      board[y][x]=0;
-}
-
-void spawnPiece() {
-  currentPiece = random(0,7);
-  rotationState = 0;
-  pieceX = WIDTH/2 - 2;
-  pieceY = 0;
-}
-
-bool collision(int newX,int newY,int newRot) {
-  for(int y=0;y<4;y++){
-    for(int x=0;x<4;x++){
-      if(pieces[currentPiece][newRot][y][x]){
-        int bx=newX+x;
-        int by=newY+y;
-
-        if(bx<0||bx>=WIDTH||by>=HEIGHT) return true;
-        if(by>=0 && board[by][bx]) return true;
-      }
-    }
+  if (freq2) {
+    phase2 += freq2;
+    digitalWrite(SPK2, (phase2 & 0x8000) ? HIGH : LOW);
   }
-  return false;
-}
-
-void lockPiece(){
-  for(int y=0;y<4;y++)
-    for(int x=0;x<4;x++)
-      if(pieces[currentPiece][rotationState][y][x])
-        board[pieceY+y][pieceX+x]=1;
-}
-
-void clearLines(){
-  for(int y=0;y<HEIGHT;y++){
-    bool full=true;
-    for(int x=0;x<WIDTH;x++)
-      if(!board[y][x]) full=false;
-
-    if(full){
-      for(int yy=y;yy>0;yy--)
-        for(int x=0;x<WIDTH;x++)
-          board[yy][x]=board[yy-1][x];
-
-      for(int x=0;x<WIDTH;x++)
-        board[0][x]=0;
-    }
+  if (freq3) {
+    phase3 += freq3;
+    digitalWrite(SPK3, (phase3 & 0x8000) ? HIGH : LOW);
   }
 }
 
-void draw(){
-  for(int y=0;y<HEIGHT;y++)
-    for(int x=0;x<WIDTH;x++)
-      frame[y][x]=board[y][x];
-
-  for(int y=0;y<4;y++)
-    for(int x=0;x<4;x++)
-      if(pieces[currentPiece][rotationState][y][x])
-        frame[pieceY+y][pieceX+x]=1;
-
-  matrix.renderBitmap(frame,HEIGHT,WIDTH);
+void play(unsigned int f1, unsigned int f2, unsigned int f3, int duration) {
+  freq1 = f1;
+  freq2 = f2;
+  freq3 = f3;
+  delay(duration);
+  freq1 = freq2 = freq3 = 0;
+  delay(20);
 }
 
-void readJoystick() {
-  static bool buttonHeld = false;
-
-  int xVal = analogRead(JOY_X);
-  int yVal = analogRead(JOY_Y);
-  int buttonState = digitalRead(JOY_SW);
-
-  // --- LEFT / RIGHT MOVEMENT ---
-  if (xVal < 300 && !collision(pieceX - 1, pieceY, rotationState)) {
-    pieceX--;
-    delay(150);
-  }
-
-  if (xVal > 700 && !collision(pieceX + 1, pieceY, rotationState)) {
-    pieceX++;
-    delay(150);
-  }
-
-  // --- ROTATION WITH BUTTON PRESS ---
-  if (buttonState == LOW && !buttonHeld) {
-    int newRot = (rotationState + 1) % 4;
-    if (!collision(pieceX, pieceY, newRot)) {
-      rotationState = newRot;
-    }
-    buttonHeld = true; // lock until button released
-  }
-
-  if (buttonState == HIGH) {
-    buttonHeld = false;
-  }
+void setup() {
+  pinMode(SPK1, OUTPUT);
+  pinMode(SPK2, OUTPUT);
+  pinMode(SPK3, OUTPUT);
+  setupTimer();
 }
 
-void setup(){
-  matrix.begin();
-  pinMode(JOY_SW,INPUT_PULLUP);
-  randomSeed(analogRead(0));
-  clearBoard();
-  spawnPiece();
-}
+void loop() {
 
-void loop(){
+  // ---- Main Fever Riff ----
+  play(E5, B4, E4, 180);
+  play(D5, B4, D4, 180);
+  play(C5, G4, C4, 180);
+  play(D5, G4, D4, 180);
 
-  readJoystick();
+  play(E5, B4, E4, 250);
+  play(G5, D5, G4, 350);
+  play(E5, B4, E4, 300);
 
-  if(millis()-lastDrop>dropInterval){
+  play(D5, B4, D4, 180);
+  play(C5, G4, C4, 180);
+  play(D5, G4, D4, 180);
+  play(E5, B4, E4, 250);
+  play(G5, D5, G4, 350);
+  play(E5, B4, E4, 400);
 
-    if(!collision(pieceX,pieceY+1,rotationState)){
-      pieceY++;
-    } else {
-      lockPiece();
-      clearLines();
-      spawnPiece();
-
-      if(collision(pieceX,pieceY,rotationState))
-        clearBoard();
-    }
-
-    lastDrop=millis();
-  }
-
-  draw();
+  delay(1000);
 }
