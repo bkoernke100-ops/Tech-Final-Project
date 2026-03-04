@@ -20,59 +20,27 @@ Resources: Chat Gpt
 #define B4 494
 #define G4 392
 #define C4 262
-
-volatile unsigned long phase1 = 0;
-volatile unsigned long phase2 = 0;
-volatile unsigned long phase3 = 0;
-
-volatile unsigned long freq1 = 0;
-volatile unsigned long freq2 = 0;
-volatile unsigned long freq3 = 0;
-
-void setupTimer() {
-  cli();
-  TCCR1A = 0;
-  TCCR1B = 0;
-  OCR1A = 159;
-  TCCR1B |= (1 << WGM12);
-  TCCR1B |= (1 << CS10);
-  TIMSK1 |= (1 << OCIE1A);
-  sei();
-}
-
-ISR(TIMER1_COMPA_vect) {
-  if (freq1) {
-    phase1 += freq1;
-    digitalWrite(SPK1, (phase1 & 0x8000) ? HIGH : LOW);
-  }
-  if (freq2) {
-    phase2 += freq2;
-    digitalWrite(SPK2, (phase2 & 0x8000) ? HIGH : LOW);
-  }
-  if (freq3) {
-    phase3 += freq3;
-    digitalWrite(SPK3, (phase3 & 0x8000) ? HIGH : LOW);
-  }
-}
-
-void play(unsigned int f1, unsigned int f2, unsigned int f3, int duration) {
-  freq1 = f1;
-  freq2 = f2;
-  freq3 = f3;
-  delay(duration);
-  freq1 = freq2 = freq3 = 0;
-  delay(20);
-}
+#define D4 294
+#define E4 330
 
 void setup() {
   pinMode(SPK1, OUTPUT);
   pinMode(SPK2, OUTPUT);
   pinMode(SPK3, OUTPUT);
-  setupTimer();
+}
+
+void play(unsigned int f1, unsigned int f2, unsigned int f3, int duration) {
+  if (f1) tone(SPK1, f1); else noTone(SPK1);
+  if (f2) tone(SPK2, f2); else noTone(SPK2);
+  if (f3) tone(SPK3, f3); else noTone(SPK3);
+  delay(duration);
+  noTone(SPK1);
+  noTone(SPK2);
+  noTone(SPK3);
+  delay(20);
 }
 
 void loop() {
-
   // ---- Main Fever Riff ----
   play(E5, B4, E4, 180);
   play(D5, B4, D4, 180);
