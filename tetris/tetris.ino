@@ -5,26 +5,28 @@ Resources: Chat Gpt
 
 // Multiplexed 12x8 LED Matrix Tetris
 
-#include "Arduino_LED_Matrix.h"
-
-ArduinoLEDMatrix matrix;
-
 #define WIDTH 8
-#define HEIGHT 8
+#define HEIGHT 12
 
+// Columns D2-D9
+const byte colPins[WIDTH] = {2,3,4,5,6,7,8,9};
+
+// Rows D10-D13 + A3-A5 (total 12 rows)
+const byte rowPins[HEIGHT] = {10,11,12,13,A3,A4,A5, -1, -1, -1, -1, -1}; // unused rows as -1
+
+<<<<<<< HEAD
 // Joystick pins
+=======
+// Joystick
+>>>>>>> Project-Servo-skull
 #define JOY_X A0
 #define JOY_Y A1
 #define JOY_SW A2
 
-uint8_t board[HEIGHT][WIDTH];
-uint8_t frame[HEIGHT][WIDTH];
-
-int pieceX, pieceY;
-int currentPiece;
-int rotationState = 0;
+byte board[HEIGHT][WIDTH];
 
 unsigned long lastDrop = 0;
+<<<<<<< HEAD
 unsigned long dropInterval = 1200; // slower fall
 
 // 4 pieces: I, Z, T, L
@@ -53,35 +55,69 @@ const uint8_t pieces[4][4][4] = {
     {1,1,0,0},
     {0,0,0,0}
   }
+=======
+unsigned long dropInterval = 600;
+
+int pieceX, pieceY;
+byte currentPiece;
+byte rotationState;
+
+// 7 Tetris pieces
+const byte pieces[7][4][4] = {
+  {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}}, // I
+  {{1,1,0,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}}, // O
+  {{0,1,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}}, // T
+  {{1,0,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}}, // L
+  {{0,0,1,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}}, // J
+  {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}}, // S
+  {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}}  // Z
+>>>>>>> Project-Servo-skull
 };
 
-// -------------------- Functions --------------------
+// ---------- Setup ----------
+void setup() {
+  for(byte i=0;i<WIDTH;i++) pinMode(colPins[i], OUTPUT);
+  for(byte i=0;i<HEIGHT;i++) if(rowPins[i]!=-1) pinMode(rowPins[i], OUTPUT);
+  
+  pinMode(JOY_SW, INPUT_PULLUP);
+  randomSeed(analogRead(0));
+  
+  clearBoard();
+  spawnPiece();
+}
 
-void clearBoard(){
+// ---------- Game Logic ----------
+void clearBoard() {
   for(int y=0;y<HEIGHT;y++)
     for(int x=0;x<WIDTH;x++)
       board[y][x]=0;
 }
 
+<<<<<<< HEAD
 void spawnPiece(){
   currentPiece = random(0,4);
   pieceX = 2;
   pieceY = -2; // spawn partially above board so full piece appears
   rotationState = 0;
+=======
+void spawnPiece() {
+  currentPiece=random(0,7);
+  rotationState=0;
+  pieceX=2;
+  pieceY=0;
+>>>>>>> Project-Servo-skull
 }
 
 bool collision(int nx,int ny,int rot){
   for(int y=0;y<4;y++){
     for(int x=0;x<4;x++){
-      int rx = x, ry = y;
+      int rx=x,ry=y;
       for(int r=0;r<rot;r++){
-        int tmp = rx;
-        rx = 3 - ry;
-        ry = tmp;
+        int tmp=rx; rx=3-ry; ry=tmp;
       }
       if(pieces[currentPiece][ry][rx]){
-        int bx = nx + x;
-        int by = ny + y;
+        int bx=nx+x;
+        int by=ny+y;
         if(bx<0 || bx>=WIDTH || by>=HEIGHT) return true;
         if(by>=0 && board[by][bx]) return true;
       }
@@ -93,17 +129,15 @@ bool collision(int nx,int ny,int rot){
 void lockPiece(){
   for(int y=0;y<4;y++){
     for(int x=0;x<4;x++){
-      int rx = x, ry = y;
+      int rx=x, ry=y;
       for(int r=0;r<rotationState;r++){
-        int tmp = rx;
-        rx = 3 - ry;
-        ry = tmp;
+        int tmp=rx; rx=3-ry; ry=tmp;
       }
       if(pieces[currentPiece][ry][rx]){
-        int bx = pieceX + x;
-        int by = pieceY + y;
-        if(by>=0 && bx>=0 && bx<WIDTH)
-          board[by][bx] = 1;
+        int px=pieceX+x;
+        int py=pieceY+y;
+        if(py>=0 && py<HEIGHT && px>=0 && px<WIDTH)
+          board[py][px]=1;
       }
     }
   }
@@ -111,19 +145,20 @@ void lockPiece(){
 
 void clearLines(){
   for(int y=0;y<HEIGHT;y++){
-    bool full = true;
+    bool full=true;
     for(int x=0;x<WIDTH;x++)
-      if(board[y][x] == 0) full = false;
+      if(board[y][x]==0) full=false;
     if(full){
-      for(int yy=y; yy>0; yy--)
+      for(int yy=y;yy>0;yy--)
         for(int x=0;x<WIDTH;x++)
-          board[yy][x] = board[yy-1][x];
+          board[yy][x]=board[yy-1][x];
       for(int x=0;x<WIDTH;x++)
-        board[0][x] = 0;
+        board[0][x]=0;
     }
   }
 }
 
+<<<<<<< HEAD
 void updateFrame(){
   // copy board
   for(int y=0;y<HEIGHT;y++)
@@ -147,58 +182,58 @@ void updateFrame(){
           if(by >= 0) frame[by][bx] = 1;
         }
       }
+=======
+// ---------- Draw Function ----------
+void draw(){
+  // Multiplexing
+  for(byte r=0;r<HEIGHT;r++){
+    if(rowPins[r]==-1) continue;
+    digitalWrite(rowPins[r], LOW); // turn row on (common cathode)
+    for(byte c=0;c<WIDTH;c++){
+      digitalWrite(colPins[c], !board[r][c]); // LOW to turn on LED
+>>>>>>> Project-Servo-skull
     }
+    delayMicroseconds(1000); // row display time
+    digitalWrite(rowPins[r], HIGH); // turn row off
   }
 }
 
+// ---------- Joystick Input ----------
 void readJoystick(){
-  int xVal = analogRead(JOY_X);
-  int yVal = analogRead(JOY_Y);
-
-  if(xVal < 300 && !collision(pieceX-1,pieceY,rotationState))
-    pieceX--;
-
-  if(xVal > 700 && !collision(pieceX+1,pieceY,rotationState))
-    pieceX++;
-
-  if(yVal > 700 && !collision(pieceX,pieceY+1,rotationState))
-    pieceY++;
-
-  // rotation on button press
-  if(analogRead(JOY_SW) < 100){
-    int newRot = (rotationState + 1) % 4;
-    if(!collision(pieceX,pieceY,newRot))
-      rotationState = newRot;
-    delay(200); // simple debounce
+  int xVal=analogRead(JOY_X);
+  int yVal=analogRead(JOY_Y);
+  
+  if(xVal<300 && !collision(pieceX-1,pieceY,rotationState)){ pieceX--; delay(150);}
+  if(xVal>700 && !collision(pieceX+1,pieceY,rotationState)){ pieceX++; delay(150);}
+  if(yVal>700 && !collision(pieceX,pieceY+1,rotationState)){ pieceY++; delay(100);}
+  
+  if(analogRead(JOY_SW)<100){
+    int newRot=(rotationState+1)%4;
+    if(!collision(pieceX,pieceY,newRot)) rotationState=newRot;
+    delay(200);
   }
 }
 
-// -------------------- Setup & Loop --------------------
-
-void setup(){
-  matrix.begin();
-  randomSeed(analogRead(0));
-  clearBoard();
-  spawnPiece();
-  pinMode(JOY_SW, INPUT_PULLUP);
-}
-
+// ---------- Main Loop ----------
 void loop(){
   readJoystick();
-
-  if(millis()-lastDrop > dropInterval){
-    if(!collision(pieceX,pieceY+1,rotationState)){
-      pieceY++;
-    } else {
+  
+  if(millis()-lastDrop>dropInterval){
+    if(!collision(pieceX,pieceY+1,rotationState)) pieceY++;
+    else{
       lockPiece();
       clearLines();
       spawnPiece();
-      if(collision(pieceX,pieceY,rotationState))
-        clearBoard(); // Game Over
+      if(collision(pieceX,pieceY,rotationState)) clearBoard(); // Game Over
     }
-    lastDrop = millis();
+    lastDrop=millis();
   }
+<<<<<<< HEAD
 
   updateFrame();
   matrix.renderBitmap(frame, 8, 8); // strictly 8x8
+=======
+  
+  draw();
+>>>>>>> Project-Servo-skull
 }

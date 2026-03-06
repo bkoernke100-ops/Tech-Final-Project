@@ -3,39 +3,85 @@ Dev: Liam Treat, Brennen Koernke
 Resources: Chat Gpt
 */
 
-#include <LedControl.h>
+#include <Arduino_LED_Matrix.h>
 
-#define DIN 11
-#define CLK 13
-#define CS 10
+ArduinoLEDMatrix matrix;
 
-LedControl lc = LedControl(DIN, CLK, CS, 1);
-
-// Joystick pins
-#define JOY_X A0
-#define JOY_Y A1
-#define JOY_SW A2   // Button now on analog pin A2
-
-#define WIDTH 8
+#define WIDTH 12
 #define HEIGHT 8
 
-byte board[HEIGHT][WIDTH];
+#define JOY_X A0
+#define JOY_Y A1
+#define JOY_SW A2
 
-unsigned long lastDrop = 0;
-unsigned long dropInterval = 600;
+uint8_t board[HEIGHT][WIDTH];
+uint8_t frame[HEIGHT][WIDTH];
 
 int pieceX, pieceY;
 int currentPiece;
-byte rotationState;
+int rotationState = 0;
 
-const byte pieces[7][4][4] = {
-  {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}}, // I
-  {{1,1,0,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}}, // O
-  {{0,1,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}}, // T
-  {{1,0,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}}, // L
-  {{0,0,1,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}}, // J
-  {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}}, // S
-  {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}}  // Z
+unsigned long lastDrop = 0;
+unsigned long dropInterval = 2000;
+
+// 7 Tetris pieces (4 rotations each)
+const uint8_t pieces[7][4][4][4] = {
+
+  // I
+  {
+    {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}},
+    {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}},
+    {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}},
+    {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}}
+  },
+
+  // O
+  {
+    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}}
+  },
+
+  // T
+  {
+    {{0,1,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
+    {{0,1,0,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}},
+    {{0,0,0,0},{1,1,1,0},{0,1,0,0},{0,0,0,0}},
+    {{0,1,0,0},{1,1,0,0},{0,1,0,0},{0,0,0,0}}
+  },
+
+  // L
+  {
+    {{1,0,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
+    {{0,1,1,0},{0,1,0,0},{0,1,0,0},{0,0,0,0}},
+    {{0,0,0,0},{1,1,1,0},{0,0,1,0},{0,0,0,0}},
+    {{0,1,0,0},{0,1,0,0},{1,1,0,0},{0,0,0,0}}
+  },
+
+  // J
+  {
+    {{0,0,1,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
+    {{0,1,0,0},{0,1,0,0},{0,1,1,0},{0,0,0,0}},
+    {{0,0,0,0},{1,1,1,0},{1,0,0,0},{0,0,0,0}},
+    {{1,1,0,0},{0,1,0,0},{0,1,0,0},{0,0,0,0}}
+  },
+
+  // S
+  {
+    {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}},
+    {{0,1,0,0},{0,1,1,0},{0,0,1,0},{0,0,0,0}},
+    {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}},
+    {{0,1,0,0},{0,1,1,0},{0,0,1,0},{0,0,0,0}}
+  },
+
+  // Z
+  {
+    {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+    {{0,0,1,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}},
+    {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+    {{0,0,1,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}}
+  }
 };
 
 void clearBoard() {
@@ -47,17 +93,18 @@ void clearBoard() {
 void spawnPiece() {
   currentPiece = random(0,7);
   rotationState = 0;
-  pieceX = 2;
+  pieceX = WIDTH/2 - 2;
   pieceY = 0;
 }
 
-bool collision(int newX, int newY) {
+bool collision(int newX,int newY,int newRot) {
   for(int y=0;y<4;y++){
     for(int x=0;x<4;x++){
-      if(pieces[currentPiece][y][x]){
-        int bx = newX + x;
-        int by = newY + y;
-        if(bx<0 || bx>=WIDTH || by>=HEIGHT) return true;
+      if(pieces[currentPiece][newRot][y][x]){
+        int bx=newX+x;
+        int by=newY+y;
+
+        if(bx<0||bx>=WIDTH||by>=HEIGHT) return true;
         if(by>=0 && board[by][bx]) return true;
       }
     }
@@ -65,109 +112,100 @@ bool collision(int newX, int newY) {
   return false;
 }
 
-void lockPiece() {
-  for(int y=0;y<4;y++){
-    for(int x=0;x<4;x++){
-      if(pieces[currentPiece][y][x]){
+void lockPiece(){
+  for(int y=0;y<4;y++)
+    for(int x=0;x<4;x++)
+      if(pieces[currentPiece][rotationState][y][x])
         board[pieceY+y][pieceX+x]=1;
-      }
-    }
-  }
 }
 
-void clearLines() {
+void clearLines(){
   for(int y=0;y<HEIGHT;y++){
     bool full=true;
     for(int x=0;x<WIDTH;x++)
-      if(board[y][x]==0) full=false;
+      if(!board[y][x]) full=false;
+
     if(full){
       for(int yy=y;yy>0;yy--)
         for(int x=0;x<WIDTH;x++)
           board[yy][x]=board[yy-1][x];
+
       for(int x=0;x<WIDTH;x++)
         board[0][x]=0;
     }
   }
 }
 
-void draw() {
-  lc.clearDisplay(0);
-
+void draw(){
   for(int y=0;y<HEIGHT;y++)
     for(int x=0;x<WIDTH;x++)
-      if(board[y][x])
-        lc.setLed(0,y,x,true);
+      frame[y][x]=board[y][x];
 
   for(int y=0;y<4;y++)
     for(int x=0;x<4;x++)
-      if(pieces[currentPiece][y][x])
-        lc.setLed(0,pieceY+y,pieceX+x,true);
-}
+      if(pieces[currentPiece][rotationState][y][x])
+        frame[pieceY+y][pieceX+x]=1;
 
-void rotatePiece() {
-  byte temp[4][4];
-  for(int y=0;y<4;y++)
-    for(int x=0;x<4;x++)
-      temp[x][3-y]=pieces[currentPiece][y][x];
-
-  byte backup[4][4];
-  memcpy(backup,pieces[currentPiece],16);
-  memcpy((void*)pieces[currentPiece],temp,16);
-
-  if(collision(pieceX,pieceY))
-    memcpy((void*)pieces[currentPiece],backup,16);
+  matrix.renderBitmap(frame,HEIGHT,WIDTH);
 }
 
 void readJoystick() {
+  static bool buttonHeld = false;
+
   int xVal = analogRead(JOY_X);
   int yVal = analogRead(JOY_Y);
+  int buttonState = digitalRead(JOY_SW);
 
-  if(xVal < 300 && !collision(pieceX-1,pieceY)){
+  // --- LEFT / RIGHT MOVEMENT ---
+  if (xVal < 300 && !collision(pieceX - 1, pieceY, rotationState)) {
     pieceX--;
     delay(150);
   }
-  if(xVal > 700 && !collision(pieceX+1,pieceY)){
+
+  if (xVal > 700 && !collision(pieceX + 1, pieceY, rotationState)) {
     pieceX++;
     delay(150);
   }
-  if(yVal > 700 && !collision(pieceX,pieceY+1)){
-    pieceY++;
-    delay(100);
+
+  // --- ROTATION WITH BUTTON PRESS ---
+  if (buttonState == LOW && !buttonHeld) {
+    int newRot = (rotationState + 1) % 4;
+    if (!collision(pieceX, pieceY, newRot)) {
+      rotationState = newRot;
+    }
+    buttonHeld = true; // lock until button released
   }
 
-  if(digitalRead(JOY_SW)==LOW){
-    rotatePiece();
-    delay(200);
+  if (buttonState == HIGH) {
+    buttonHeld = false;
   }
 }
 
-void setup() {
-  lc.shutdown(0,false);
-  lc.setIntensity(0,8);
-  lc.clearDisplay(0);
-
-  pinMode(JOY_SW, INPUT_PULLUP);
-
+void setup(){
+  matrix.begin();
+  pinMode(JOY_SW,INPUT_PULLUP);
   randomSeed(analogRead(0));
-
   clearBoard();
   spawnPiece();
 }
 
-void loop() {
+void loop(){
+
   readJoystick();
 
   if(millis()-lastDrop>dropInterval){
-    if(!collision(pieceX,pieceY+1)){
+
+    if(!collision(pieceX,pieceY+1,rotationState)){
       pieceY++;
     } else {
       lockPiece();
       clearLines();
       spawnPiece();
-      if(collision(pieceX,pieceY)){
+
+      if(collision(pieceX,pieceY,rotationState))
         clearBoard();
-      }
     }
+
     lastDrop=millis();
   }
 
