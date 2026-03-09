@@ -179,38 +179,43 @@ matrix.renderBitmap(frame,HEIGHT,WIDTH);
 
 // ----------- JOYSTICK MOVEMENT -----------
 
-void readJoystick(){
+// ----------- JOYSTICK MOVEMENT -----------
+void readJoystick() {
+  static bool buttonHeld = false;
+  const int moveDelay = 150;          // milliseconds between moves
 
-int xVal=analogRead(JOY_X);
-int button=digitalRead(JOY_SW);
+  int xVal = analogRead(JOY_X);
+  int buttonState = digitalRead(JOY_SW);
 
-if(millis()-lastMove>120){
+  // LEFT
+  if (xVal < 350 && millis() - lastMove > moveDelay) { 
+    if (!collision(pieceX - 1, pieceY, rotationState)) {
+      pieceX--;
+    }
+    lastMove = millis();
+  }
 
-if(xVal<350){
-if(!collision(pieceX-1,pieceY,rotationState))
-pieceX--;
-lastMove=millis();
+  // RIGHT
+  if (xVal > 700 && millis() - lastMove > moveDelay) { 
+    if (!collision(pieceX + 1, pieceY, rotationState)) {
+      pieceX++;
+    }
+    lastMove = millis();
+  }
+
+  // ROTATE
+  if (buttonState == LOW && !buttonHeld) {
+    int newRot = (rotationState + 1) % 4;
+    if (!collision(pieceX, pieceY, newRot)) {
+      rotationState = newRot;
+    }
+    buttonHeld = true;
+  }
+
+  if (buttonState == HIGH) {
+    buttonHeld = false;
+  }
 }
-
-if(xVal>700){
-if(!collision(pieceX+1,pieceY,rotationState))
-pieceX++;
-lastMove=millis();
-}
-}
-
-static bool held=false;
-
-if(button==LOW && !held){
-int newRot=(rotationState+1)%4;
-if(!collision(pieceX,pieceY,newRot))
-rotationState=newRot;
-held=true;
-}
-
-if(button==HIGH) held=false;
-}
-
 // ---------------- MUSIC ----------------
 
 void playMusic(){
