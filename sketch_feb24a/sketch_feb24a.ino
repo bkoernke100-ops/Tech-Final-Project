@@ -70,7 +70,7 @@ int currentPiece;
 int rotationState=0;
 
 unsigned long lastDrop=0;
-unsigned long dropInterval=2000;
+unsigned long dropInterval=1000;
 
 unsigned long lastMove=0;
 
@@ -182,40 +182,36 @@ matrix.renderBitmap(frame,HEIGHT,WIDTH);
 // ----------- JOYSTICK MOVEMENT -----------
 void readJoystick() {
   static bool buttonHeld = false;
-  const int moveDelay = 150;          // milliseconds between moves
 
   int xVal = analogRead(JOY_X);
+  int yVal = analogRead(JOY_Y);
   int buttonState = digitalRead(JOY_SW);
 
-  // LEFT
-  if (xVal < 350 && millis() - lastMove > moveDelay) { 
-    if (!collision(pieceX - 1, pieceY, rotationState)) {
-      pieceX--;
-    }
-    lastMove = millis();
+  // --- LEFT / RIGHT MOVEMENT ---
+  if (xVal < 300 && !collision(pieceX - 1, pieceY, rotationState)) {
+    pieceX--;
+    delay(150);
   }
 
-  // RIGHT
-  if (xVal > 700 && millis() - lastMove > moveDelay) { 
-    if (!collision(pieceX + 1, pieceY, rotationState)) {
-      pieceX++;
-    }
-    lastMove = millis();
+  if (xVal > 700 && !collision(pieceX + 1, pieceY, rotationState)) {
+    pieceX++;
+    delay(150);
   }
 
-  // ROTATE
+  // --- ROTATION WITH BUTTON PRESS ---
   if (buttonState == LOW && !buttonHeld) {
     int newRot = (rotationState + 1) % 4;
     if (!collision(pieceX, pieceY, newRot)) {
       rotationState = newRot;
     }
-    buttonHeld = true;
+    buttonHeld = true; // lock until button released
   }
 
   if (buttonState == HIGH) {
     buttonHeld = false;
   }
 }
+
 // ---------------- MUSIC ----------------
 
 void playMusic(){
