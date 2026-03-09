@@ -14,6 +14,56 @@ ArduinoLEDMatrix matrix;
 #define JOY_Y A1
 #define JOY_SW A2
 
+// ---------------- SPEAKERS ----------------
+#define SPK1 9
+#define SPK2 10
+#define SPK3 11
+
+// Note Frequencies
+#define E5 659
+#define D5 587
+#define C5 523
+#define G5 784
+#define B4 494
+#define A4 440
+#define G4 392
+#define E4 330
+#define D4 294
+#define C4 262
+#define G3 196
+
+// Song structure
+struct Note {
+  int m;
+  int h;
+  int b;
+  int dur;
+};
+
+Note song[] = {
+  {E5,B4,E4,180},
+  {D5,B4,D4,180},
+  {C5,G4,C4,180},
+  {D5,G4,D4,180},
+
+  {E5,B4,E4,250},
+  {G5,D5,G4,350},
+  {E5,B4,E4,300},
+
+  {D5,B4,D4,180},
+  {C5,G4,C4,180},
+  {D5,G4,D4,180},
+  {E5,B4,E4,250},
+  {G5,D5,G4,350},
+  {E5,B4,E4,400}
+};
+
+int songLength = sizeof(song)/sizeof(song[0]);
+int currentNote = 0;
+unsigned long lastNoteTime = 0;
+
+// ---------------- GAME VARIABLES ----------------
+
 uint8_t board[HEIGHT][WIDTH];
 uint8_t frame[HEIGHT][WIDTH];
 
@@ -24,91 +74,70 @@ int rotationState = 0;
 unsigned long lastDrop = 0;
 unsigned long dropInterval = 2000;
 
-// 7 Tetris pieces (4 rotations each)
+// 7 Tetris pieces
 const uint8_t pieces[7][4][4][4] = {
 
-  // I
-  {
-    {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}},
-    {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}},
-    {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}}
-  },
+{{{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}},
+ {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}},
+ {{0,1,0,0},{0,1,0,0},{0,1,0,0},{0,1,0,0}},
+ {{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}}},
 
-  // O
-  {
-    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}}
-  },
+{{{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+ {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+ {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+ {{0,1,1,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}}},
 
-  // T
-  {
-    {{0,1,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}},
-    {{0,0,0,0},{1,1,1,0},{0,1,0,0},{0,0,0,0}},
-    {{0,1,0,0},{1,1,0,0},{0,1,0,0},{0,0,0,0}}
-  },
+{{{0,1,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
+ {{0,1,0,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}},
+ {{0,0,0,0},{1,1,1,0},{0,1,0,0},{0,0,0,0}},
+ {{0,1,0,0},{1,1,0,0},{0,1,0,0},{0,0,0,0}}},
 
-  // L
-  {
-    {{1,0,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,1,0},{0,1,0,0},{0,1,0,0},{0,0,0,0}},
-    {{0,0,0,0},{1,1,1,0},{0,0,1,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,0,0},{1,1,0,0},{0,0,0,0}}
-  },
+{{{1,0,0,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
+ {{0,1,1,0},{0,1,0,0},{0,1,0,0},{0,0,0,0}},
+ {{0,0,0,0},{1,1,1,0},{0,0,1,0},{0,0,0,0}},
+ {{0,1,0,0},{0,1,0,0},{1,1,0,0},{0,0,0,0}}},
 
-  // J
-  {
-    {{0,0,1,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,0,0},{0,1,1,0},{0,0,0,0}},
-    {{0,0,0,0},{1,1,1,0},{1,0,0,0},{0,0,0,0}},
-    {{1,1,0,0},{0,1,0,0},{0,1,0,0},{0,0,0,0}}
-  },
+{{{0,0,1,0},{1,1,1,0},{0,0,0,0},{0,0,0,0}},
+ {{0,1,0,0},{0,1,0,0},{0,1,1,0},{0,0,0,0}},
+ {{0,0,0,0},{1,1,1,0},{1,0,0,0},{0,0,0,0}},
+ {{1,1,0,0},{0,1,0,0},{0,1,0,0},{0,0,0,0}}},
 
-  // S
-  {
-    {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,1,0},{0,0,1,0},{0,0,0,0}},
-    {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}},
-    {{0,1,0,0},{0,1,1,0},{0,0,1,0},{0,0,0,0}}
-  },
+{{{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}},
+ {{0,1,0,0},{0,1,1,0},{0,0,1,0},{0,0,0,0}},
+ {{0,1,1,0},{1,1,0,0},{0,0,0,0},{0,0,0,0}},
+ {{0,1,0,0},{0,1,1,0},{0,0,1,0},{0,0,0,0}}},
 
-  // Z
-  {
-    {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,0,1,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}},
-    {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
-    {{0,0,1,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}}
-  }
+{{{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+ {{0,0,1,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}},
+ {{1,1,0,0},{0,1,1,0},{0,0,0,0},{0,0,0,0}},
+ {{0,0,1,0},{0,1,1,0},{0,1,0,0},{0,0,0,0}}}
+
 };
 
-void clearBoard() {
+// ---------------- GAME FUNCTIONS ----------------
+
+void clearBoard(){
   for(int y=0;y<HEIGHT;y++)
     for(int x=0;x<WIDTH;x++)
       board[y][x]=0;
 }
 
-void spawnPiece() {
-  currentPiece = random(0,7);
-  rotationState = 0;
-  pieceX = WIDTH/2 - 2;
-  pieceY = 0;
+void spawnPiece(){
+  currentPiece=random(0,7);
+  rotationState=0;
+  pieceX=WIDTH/2-2;
+  pieceY=0;
 }
 
-bool collision(int newX,int newY,int newRot) {
-  for(int y=0;y<4;y++){
-    for(int x=0;x<4;x++){
+bool collision(int newX,int newY,int newRot){
+  for(int y=0;y<4;y++)
+    for(int x=0;x<4;x++)
       if(pieces[currentPiece][newRot][y][x]){
         int bx=newX+x;
         int by=newY+y;
-
         if(bx<0||bx>=WIDTH||by>=HEIGHT) return true;
         if(by>=0 && board[by][bx]) return true;
       }
-    }
-  }
   return false;
 }
 
@@ -129,7 +158,6 @@ void clearLines(){
       for(int yy=y;yy>0;yy--)
         for(int x=0;x<WIDTH;x++)
           board[yy][x]=board[yy-1][x];
-
       for(int x=0;x<WIDTH;x++)
         board[0][x]=0;
     }
@@ -149,55 +177,95 @@ void draw(){
   matrix.renderBitmap(frame,HEIGHT,WIDTH);
 }
 
-void readJoystick() {
+void readJoystick(){
+
   static bool buttonHeld = false;
 
   int xVal = analogRead(JOY_X);
-  int yVal = analogRead(JOY_Y);
   int buttonState = digitalRead(JOY_SW);
 
-  // --- LEFT / RIGHT MOVEMENT ---
-  if (xVal < 300 && !collision(pieceX - 1, pieceY, rotationState)) {
-    pieceX--;
-    delay(150);
+  // ---- DEADZONE VALUES ----
+  int leftThreshold = 350;
+  int rightThreshold = 650;
+
+  // LEFT
+  if(xVal < leftThreshold){
+    if(!collision(pieceX-1,pieceY,rotationState)){
+      pieceX--;
+    }
+    delay(120);
   }
 
-  if (xVal > 700 && !collision(pieceX + 1, pieceY, rotationState)) {
-    pieceX++;
-    delay(150);
+  // RIGHT
+  if(xVal > rightThreshold){
+    if(!collision(pieceX+1,pieceY,rotationState)){
+      pieceX++;
+    }
+    delay(120);
   }
 
-  // --- ROTATION WITH BUTTON PRESS ---
-  if (buttonState == LOW && !buttonHeld) {
+  // ROTATE
+  if(buttonState == LOW && !buttonHeld){
     int newRot = (rotationState + 1) % 4;
-    if (!collision(pieceX, pieceY, newRot)) {
+    if(!collision(pieceX,pieceY,newRot)){
       rotationState = newRot;
     }
-    buttonHeld = true; // lock until button released
+    buttonHeld = true;
   }
 
-  if (buttonState == HIGH) {
+  if(buttonState == HIGH){
     buttonHeld = false;
   }
 }
 
+// ---------------- MUSIC ----------------
+
+void playMusic(){
+  if(millis()-lastNoteTime >= song[currentNote].dur){
+
+    tone(SPK1,song[currentNote].m);
+    tone(SPK2,song[currentNote].h);
+    tone(SPK3,song[currentNote].b);
+
+    lastNoteTime=millis();
+    currentNote++;
+
+    if(currentNote>=songLength)
+      currentNote=0;
+  }
+}
+
+// ---------------- SETUP ----------------
+
 void setup(){
+
   matrix.begin();
+
   pinMode(JOY_SW,INPUT_PULLUP);
+
+  pinMode(SPK1,OUTPUT);
+  pinMode(SPK2,OUTPUT);
+  pinMode(SPK3,OUTPUT);
+
   randomSeed(analogRead(0));
+
   clearBoard();
   spawnPiece();
 }
+
+// ---------------- LOOP ----------------
 
 void loop(){
 
   readJoystick();
 
+  playMusic();
+
   if(millis()-lastDrop>dropInterval){
 
     if(!collision(pieceX,pieceY+1,rotationState)){
       pieceY++;
-    } else {
+    }else{
       lockPiece();
       clearLines();
       spawnPiece();
