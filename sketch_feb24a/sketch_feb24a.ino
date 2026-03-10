@@ -5,6 +5,13 @@ Resources: Chat Gpt
 
 #include <Arduino_LED_Matrix.h>
 
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27,16,2);
+
+int score = 0;
+
 ArduinoLEDMatrix matrix;
 
 #define WIDTH 12
@@ -149,14 +156,29 @@ board[pieceY+y][pieceX+x]=1;
 
 void clearLines(){
 for(int y=0;y<HEIGHT;y++){
+
 bool full=true;
-for(int x=0;x<WIDTH;x++)
+
+for(int x=0;x<WIDTH;x++){
 if(!board[y][x]) full=false;
+}
 
 if(full){
-for(int yy=y;yy>0;yy--)
-for(int x=0;x<WIDTH;x++)
+
+// add score
+score += 100;
+
+lcd.setCursor(7,1);
+lcd.print("     "); // clear old digits
+lcd.setCursor(7,1);
+lcd.print(score);
+
+// move lines down
+for(int yy=y;yy>0;yy--){
+for(int x=0;x<WIDTH;x++){
 board[yy][x]=board[yy-1][x];
+}
+}
 
 for(int x=0;x<WIDTH;x++)
 board[0][x]=0;
@@ -245,6 +267,14 @@ randomSeed(analogRead(0));
 
 clearBoard();
 spawnPiece();
+lcd.init();
+lcd.backlight();
+
+lcd.setCursor(0,0);
+lcd.print("TETRIS");
+
+lcd.setCursor(0,1);
+lcd.print("Score: 0");
 }
 
 // ---------------- LOOP ----------------
@@ -264,8 +294,13 @@ lockPiece();
 clearLines();
 spawnPiece();
 
-if(collision(pieceX,pieceY,rotationState))
+if(collision(pieceX,pieceY,rotationState)){
 clearBoard();
+score = 0;
+
+lcd.setCursor(7,1);
+lcd.print("0    ");
+}
 }
 
 lastDrop=millis();
