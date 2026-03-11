@@ -1,6 +1,7 @@
 /*
 Dev: Liam Treat, Brennen Koernke
 Resources: Chat Gpt
+Project Face Remodel
 */
 
 #include <Arduino_LED_Matrix.h>
