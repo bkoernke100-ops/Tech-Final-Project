@@ -14,6 +14,14 @@ int score = 0;
 
 ArduinoLEDMatrix matrix;
 
+// -------- SCORE LEDS --------
+#define LED100 2
+#define LED200 3
+#define LED300 4
+#define LED400 5
+#define LED500 6
+#define LED600 7
+
 #define WIDTH 12
 #define HEIGHT 8
 
@@ -250,7 +258,27 @@ if(currentNote>=songLength)
 currentNote=0;
 }
 }
+void updateScoreLEDs(){
 
+if(score >= 100) digitalWrite(LED100, HIGH);
+else digitalWrite(LED100, LOW);
+
+if(score >= 200) digitalWrite(LED200, HIGH);
+else digitalWrite(LED200, LOW);
+
+if(score >= 300) digitalWrite(LED300, HIGH);
+else digitalWrite(LED300, LOW);
+
+if(score >= 400) digitalWrite(LED400, HIGH);
+else digitalWrite(LED400, LOW);
+
+if(score >= 500) digitalWrite(LED500, HIGH);
+else digitalWrite(LED500, LOW);
+
+if(score >= 600) digitalWrite(LED600, HIGH);
+else digitalWrite(LED600, LOW);
+
+}
 // ---------------- SETUP ----------------
 
 void setup(){
@@ -275,6 +303,14 @@ lcd.print("TETRIS");
 
 lcd.setCursor(0,1);
 lcd.print("Score: 0");
+
+pinMode(LED100, OUTPUT);
+pinMode(LED200, OUTPUT);
+pinMode(LED300, OUTPUT);
+pinMode(LED400, OUTPUT);
+pinMode(LED500, OUTPUT);
+pinMode(LED600, OUTPUT);
+
 }
 
 // ---------------- LOOP ----------------
@@ -284,6 +320,8 @@ void loop(){
 readJoystick();
 
 playMusic();
+
+updateScoreLEDs();
 
 if(millis()-lastDrop>dropInterval){
 
